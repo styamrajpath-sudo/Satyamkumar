@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NumberPanel – WhatsApp Number Reseller</title>
+<style>
+:root{--bg:#f3f1ec;--card:#fff;--ink:#14221f;--mut:#5d6b67;--line:#d9d5cc;--pri:#0e5a4f;--onpri:#fff;--acc:#e0a526;--bad:#b3261e;--ok:#1b7a3d}
+@media(prefers-color-scheme:dark){:root{--bg:#10181a;--card:#182326;--ink:#e8efec;--mut:#9fb0ab;--line:#2c3b3e;--pri:#3fb59f;--onpri:#0b1517;--bad:#ff8a80;--ok:#6fd48f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Segoe UI",system-ui,Roboto,sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;background:var(--pri);color:var(--onpri);flex-wrap:wrap}
+header b{font-size:18px;letter-spacing:.2px}
+header span{opacity:.9}
+nav{display:flex;gap:6px;padding:10px 16px;overflow-x:auto;border-bottom:1px solid var(--line);background:var(--card)}
+nav button{background:none;border:0;padding:8px 14px;border-radius:8px;color:var(--mut);font:inherit;cursor:pointer;white-space:nowrap}
+nav button.on{background:var(--pri);color:var(--onpri)}
+main{max-width:980px;margin:0 auto;padding:18px 16px 60px}
+h2{margin:6px 0 14px;font-size:20px}
+h3{margin:0 0 10px;font-size:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.stat{font-size:26px;font-weight:700}
+.mut{color:var(--mut);font-size:13px}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;margin:4px 0 10px}
+textarea{min-height:110px}
+label{font-size:13px;color:var(--mut)}
+button.b{background:var(--pri);color:var(--onpri);border:0;border-radius:8px;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}
+button.b.s{padding:5px 10px;font-size:13px}
+button.b.r{background:var(--bad);color:#fff}
+button.b.g{background:var(--ok);color:#fff}
+button.b.o{background:none;color:var(--ink);border:1px solid var(--line)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--mut);font-weight:600}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;border:1px solid var(--line)}
+.tag.ok{color:var(--ok);border-color:var(--ok)}.tag.bad{color:var(--bad);border-color:var(--bad)}.tag.w{color:#a06b00;border-color:var(--acc)}
+.auth{max-width:400px;margin:40px auto}
+.qr{max-width:220px;width:100%;border-radius:10px;border:1px solid var(--line);display:block;margin:6px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:8px;display:none;z-index:9;max-width:90%}
+.ok-box,.bad-box{padding:12px 14px;border-radius:10px;margin-bottom:14px;font-weight:600;display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap}.ok-box{background:rgba(27,122,61,.14);border:1px solid var(--ok);color:var(--ok)}.bad-box{background:rgba(179,38,30,.12);border:1px solid var(--bad);color:var(--bad)}
+.warn{background:rgba(224,165,38,.15);border:1px solid var(--acc);padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:14px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast"></div>
+<script>
+const MODE='user',SK='sess_'+MODE;
+let need=0;
+const K='numpanel_db_v1';
+let DB,S=JSON.parse(sessionStorage.getItem(SK)||'null'),tab='',mode='login';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+const now=()=>new Date().toLocaleString('en-IN');
+const inr=n=>'₹'+Number(n).toFixed(2).replace(/\.00$/,'');
+async function H(s){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){return btoa(unescape(encodeURIComponent(s)))}}
+function save(){try{localStorage.setItem(K,JSON.stringify(DB))}catch(e){toast('Storage full – QR image chhoti rakhein')}}
+function log(t,u,x){DB.logs=DB.logs||[];DB.logs.push({id:uid(),t,userId:u||null,txt:x,date:now()});if(DB.logs.length>500)DB.logs.shift()}
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._x);t._x=setTimeout(()=>t.style.display='none',2600)}
+async function init(){
+  try{DB=JSON.parse(localStorage.getItem(K))}catch(e){}
+  if(!DB){DB={users:[],deposits:[],orders:[],stock:[],
+    prices:[{code:'USA',name:'USA',price:100},{code:'UK',name:'United Kingdom',price:200},{code:'IN',name:'India',price:150},{code:'PK',name:'Pakistan',price:200}],
+    settings:{upi:'',qr:'',admin:'Kumar',pass:await H('Shivam')},logs:[],v:2};save()}
+  if(DB.v!==2){DB.settings.admin='Kumar';DB.settings.pass=await H('Shivam');DB.logs=DB.logs||[];DB.v=2;save()}
+  window.addEventListener('storage',e=>{if(e.key===K&&e.newValue){DB=JSON.parse(e.newValue);const a=document.activeElement;if(!a||!/INPUT|TEXTAREA|SELECT/.test(a.tagName))render()}});
+  render();
+}
+const me=()=>DB.users.find(u=>u.id===S?.id);
+const stockLeft=c=>DB.stock.filter(n=>n.country===c&&!n.sold).length;
+
+/* ---------- AUTH ---------- */
+function authView(){
+  const reg=MODE==='user'&&mode==='reg';
+  return `<div class="auth card"><h2>${reg?'Naya account banayein':MODE==='admin'?'Admin login':'Login'}</h2>
+  ${reg?`<label>Email</label><input id="em" type="email" autocomplete="email">`:''}
+  <label>${reg?'Username':'Username ya Email'}</label><input id="un" autocomplete="username">
+  <label>Password</label><input id="pw" type="password" autocomplete="${reg?'new-password':'current-password'}">
+  <div class="row"><button class="b" onclick="${reg?'doReg()':'doLogin()'}">${reg?'Register':'Login'}</button>
+  ${MODE==='user'?`<button class="b o" onclick="mode='${reg?'login':'reg'}';render()">${reg?'Pehle se account hai?':'Naya account'}</button>`:''}</div></div>`}
+async function doReg(){
+  const em=$('#em').value.trim().toLowerCase(),un=$('#un').value.trim(),pw=$('#pw').value;
+  if(!/^\S+@\S+\.\S+$/.test(em))return toast('Sahi email daalein');
+  if(un.length<3||pw.length<6)return toast('Username 3+ aur password 6+ characters');
+  if(DB.users.some(u=>u.email===em||u.username.toLowerCase()===un.toLowerCase())||un.toLowerCase()===DB.settings.admin.toLowerCase())return toast('Email ya username pehle se hai');
+  const u={id:uid(),email:em,username:un,pass:await H(pw),balance:0,blocked:false,joined:now()};
+  DB.users.push(u);log('register',u.id,'Naya account: '+un+' ('+em+')');save();S={role:'user',id:u.id};sessionStorage.setItem(SK,JSON.stringify(S));tab='buy';render();toast('Account ban gaya')}
+async function doLogin(){
+  const un=$('#un').value.trim(),pw=await H($('#pw').value);
+  if(MODE==='admin'){if(un.toLowerCase()!==DB.settings.admin.toLowerCase()||pw!==DB.settings.pass)return toast('Galat admin username ya password');S={role:'admin'};tab='dash'}
+  else{const u=DB.users.find(x=>(x.username.toLowerCase()===un.toLowerCase()||x.email===un.toLowerCase())&&x.pass===pw);
+    if(!u)return toast('Galat username ya password');
+    if(u.blocked)return toast('Aapka account block hai');
+    S={role:'user',id:u.id};tab='buy';log('login',u.id,'Login kiya');save()}
+  sessionStorage.setItem(SK,JSON.stringify(S));render()}
+function logout(){if(S&&S.role==='user'){log('logout',S.id,'Logout kiya');save()}S=null;sessionStorage.removeItem(SK);mode='login';render()}
+
+/* ---------- USER ---------- */
+function userView(){
+  const u=me();if(!u)return logout();
+  const t=tab||'buy';
+  let body='';
+  const ban=DB.deposits.filter(d=>d.userId===u.id&&d.status!=='pending'&&d.seen===false).map(d=>d.status==='approved'?`<div class="ok-box"><span>✅ Payment successful – ${inr(d.amount)} aapke balance mein add ho gaye (UTR ${esc(d.utr)})</span><button class="b s o" onclick="seen('${d.id}')">OK</button></div>`:`<div class="bad-box"><span>❌ Payment verify nahi hui (UTR ${esc(d.utr)}). Sahi UTR ke saath dobara try karein.</span><button class="b s o" onclick="seen('${d.id}')">OK</button></div>`).join('');
+  if(t==='buy')body=`<h2>Number kharidein</h2><div class="grid">`+DB.prices.map(p=>`<div class="card"><h3>${esc(p.name)}</h3><div class="stat">${inr(p.price)}</div><div class="mut">Stock: ${stockLeft(p.code)}</div><br><button class="b" ${stockLeft(p.code)?'':'disabled'} onclick="buy('${p.code}')">${stockLeft(p.code)?'Buy karein':'Out of stock'}</button></div>`).join('')+`</div>`;
+  if(t==='fund'){const s=DB.settings;body=`<h2>Balance add karein</h2><div class="card">
+    <h3>Step 1 – Payment karein</h3>
+    ${s.qr?`<img class="qr" src="${esc(s.qr)}" alt="Payment QR">`:'<p class="mut">Admin ne abhi QR nahi lagaya.</p>'}
+    ${s.upi?`<p>UPI ID: <b>${esc(s.upi)}</b></p>`:''}
+    <h3>Step 2 – UTR daalein</h3>
+    <label>Amount (₹)</label><input id="amt" type="number" min="1" value="${need||''}">
+    <label>UTR / Transaction ID (12 digit)</label><input id="utr" inputmode="numeric" maxlength="12">
+    <button class="b" onclick="addDeposit()">Submit karein</button>
+    <p class="mut">Admin verify karte hi balance add ho jayega.</p></div>
+    <h3>Aapki requests</h3>${depTable(DB.deposits.filter(d=>d.userId===u.id),false)}`}
+  if(t==='ord'){const o=DB.orders.filter(x=>x.userId===u.id).reverse();body=`<h2>Mere numbers</h2><div class="card tw"><table><tr><th>Date</th><th>Country</th><th>Number</th><th>Price</th></tr>${o.map(x=>`<tr><td>${x.date}</td><td>${esc(x.countryName)}</td><td><b>${esc(x.number)}</b></td><td>${inr(x.price)}</td></tr>`).join('')||'<tr><td colspan=4 class="mut">Abhi koi number nahi kharida.</td></tr>'}</table></div>`}
+  body=ban+body;
+  return shell(`${esc(u.username)} · Balance <b>${inr(u.balance)}</b>`,[['buy','Number kharidein'],['fund','Add balance'],['ord','Mere numbers']],t,body)}
+function buy(c){
+  const u=me(),p=DB.prices.find(x=>x.code===c),n=DB.stock.find(x=>x.country===c&&!x.sold);
+  if(!n)return toast('Stock khatam');if(u.balance<p.price){need=p.price-u.balance;tab='fund';log('view',u.id,p.name+' number lena chaha, balance kam tha – payment page khola');save();render();return toast('Balance kam hai – QR se payment karke UTR daalein')}
+  if(!confirm(`${p.name} number ${inr(p.price)} mein kharidein?`))return;
+  u.balance-=p.price;n.sold=true;n.buyer=u.id;
+  DB.orders.push({id:uid(),userId:u.id,country:c,countryName:p.name,number:n.number,price:p.price,date:now()});
+  log('buy',u.id,p.name+' number kharida: '+n.number+' ('+inr(p.price)+')');save();tab='ord';render();toast('Number mil gaya: '+n.number)}
+function addDeposit(){
+  const a=+$('#amt').value,t=$('#utr').value.trim();
+  if(!(a>0))return toast('Amount daalein');if(!/^\d{12}$/.test(t))return toast('UTR 12 digit ka hona chahiye');
+  if(DB.deposits.some(d=>d.utr===t))return toast('Ye UTR pehle use ho chuka hai');
+  DB.deposits.push({id:uid(),userId:me().id,amount:a,utr:t,status:'pending',date:now(),seen:false});need=0;log('deposit',me().id,'Deposit request '+inr(a)+' · UTR '+t+' (verify baaki)');save();render();toast('Request bhej di – payment verify hone par hi success dikhega')}
+function depTable(list,admin){
+  const tag=s=>`<span class="tag ${s==='approved'?'ok':s==='rejected'?'bad':'w'}">${s==='approved'?'successful':s==='rejected'?'failed':'verify ho raha hai'}</span>`;
+  return `<div class="card tw"><table><tr><th>Date</th>${admin?'<th>User</th>':''}<th>Amount</th><th>UTR</th><th>Status</th>${admin?'<th></th>':''}</tr>`+
+  ([...list].reverse().map(d=>{const u=DB.users.find(x=>x.id===d.userId);return `<tr><td>${d.date}</td>${admin?`<td>${esc(u?u.username:'?')}</td>`:''}<td>${inr(d.amount)}</td><td>${esc(d.utr)}</td><td>${tag(d.status)}</td>${admin?`<td>${d.status==='pending'?`<button class="b s g" onclick="decide('${d.id}',1)">Approve</button> <button class="b s r" onclick="decide('${d.id}',0)">Reject</button>`:''}</td>`:''}</tr>`}).join('')||`<tr><td colspan=6 class="mut">Kuch nahi hai.</td></tr>`)+`</table></div>`}
+
+/* ---------- ADMIN ---------- */
+function adminView(){
+  const t=tab||'dash',s=DB.settings;let b='';
+  const pend=DB.deposits.filter(d=>d.status==='pending').length;
+  if(t==='dash'){
+    const rev=DB.orders.reduce((a,o)=>a+o.price,0),dep=DB.deposits.filter(d=>d.status==='approved').reduce((a,d)=>a+d.amount,0);
+    const st=[['Resellers',DB.users.length],['Pending deposits',pend],['Numbers sold',DB.orders.length],['Total sales',inr(rev)],['Approved deposits',inr(dep)],['Stock bacha',DB.stock.filter(n=>!n.sold).length]];
+    b=`<h2>Dashboard</h2><div class="grid">${st.map(x=>`<div class="card"><div class="mut">${x[0]}</div><div class="stat">${x[1]}</div></div>`).join('')}</div>
+    <h3>Recent orders</h3><div class="card tw"><table><tr><th>Date</th><th>User</th><th>Country</th><th>Number</th><th>Price</th></tr>${[...DB.orders].reverse().slice(0,15).map(o=>`<tr><td>${o.date}</td><td>${esc(DB.users.find(u=>u.id===o.userId)?.username||'?')}</td><td>${esc(o.countryName)}</td><td>${esc(o.number)}</td><td>${inr(o.price)}</td></tr>`).join('')||'<tr><td colspan=5 class="mut">Abhi koi order nahi.</td></tr>'}</table></div>`}
+  if(t==='dep')b=`<h2>Deposit requests</h2>`+depTable(DB.deposits,true);
+  if(t==='act')b=`<h2>Activity log</h2><p class="mut">Reseller jo bhi karte hain (register, login, payment, kharid) yahan dikhta hai.</p><div class="card tw"><table><tr><th>Date</th><th>User</th><th>Action</th><th>Details</th></tr>${[...(DB.logs||[])].reverse().slice(0,300).map(l=>`<tr><td>${l.date}</td><td>${esc(DB.users.find(u=>u.id===l.userId)?.username||'—')}</td><td><span class="tag ${l.t==='buy'||l.t==='register'?'ok':l.t==='admin'?'w':''}">${esc(l.t)}</span></td><td style="white-space:normal">${esc(l.txt)}</td></tr>`).join('')||'<tr><td colspan=4 class="mut">Abhi koi activity nahi.</td></tr>'}</table></div>`;
+  if(t==='usr')b=`<h2>Resellers</h2><div class="card tw"><table><tr><th>Username</th><th>Email</th><th>Balance</th><th>Orders</th><th>Joined</th><th></th></tr>${DB.users.map(u=>`<tr><td>${esc(u.username)} ${u.blocked?'<span class="tag bad">blocked</span>':''}</td><td>${esc(u.email)}</td><td>${inr(u.balance)}</td><td>${DB.orders.filter(o=>o.userId===u.id).length}</td><td>${u.joined}</td><td><button class="b s" onclick="adjBal('${u.id}')">Balance</button> <button class="b s o" onclick="blk('${u.id}')">${u.blocked?'Unblock':'Block'}</button> <button class="b s o" onclick="resetPw('${u.id}')">Password</button> <button class="b s r" onclick="delUser('${u.id}')">Delete</button></td></tr>`).join('')||'<tr><td colspan=6 class="mut">Abhi koi reseller nahi.</td></tr>'}</table></div>`;
+  if(t==='stk'){const list=[...DB.stock].reverse().slice(0,200);b=`<h2>Number stock</h2><div class="card"><label>Country</label><select id="sc">${DB.prices.map(p=>`<option value="${p.code}">${esc(p.name)}</option>`).join('')}</select>
+    <label>Numbers (ek line mein ek number)</label><textarea id="sn" placeholder="+14155550101&#10;+14155550102"></textarea><button class="b" onclick="addStock()">Stock add karein</button></div>
+    <div class="card tw"><table><tr><th>Country</th><th>Number</th><th>Status</th><th></th></tr>${list.map(n=>`<tr><td>${esc(DB.prices.find(p=>p.code===n.country)?.name||n.country)}</td><td>${esc(n.number)}</td><td>${n.sold?`<span class="tag">sold – ${esc(DB.users.find(u=>u.id===n.buyer)?.username||'?')}</span>`:'<span class="tag ok">available</span>'}</td><td>${n.sold?'':`<button class="b s r" onclick="delStock('${n.id}')">Delete</button>`}</td></tr>`).join('')||'<tr><td colspan=4 class="mut">Stock khaali hai.</td></tr>'}</table></div>`}
+  if(t==='prc')b=`<h2>Countries aur prices</h2><div class="card tw"><table><tr><th>Country</th><th>Code</th><th>Price (₹)</th><th></th></tr>${DB.prices.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.code)}</td><td><input style="width:100px;margin:0" type="number" value="${p.price}" onchange="setPrice('${p.code}',this.value)"></td><td><button class="b s r" onclick="delCountry('${p.code}')">Delete</button></td></tr>`).join('')}</table></div>
+    <div class="card"><h3>Nayi country add karein</h3><div class="row"><input id="cn" placeholder="Naam (e.g. Canada)" style="flex:2"><input id="cc" placeholder="Code (CA)" style="flex:1"><input id="cp" type="number" placeholder="Price ₹" style="flex:1"><button class="b" onclick="addCountry()">Add</button></div></div>`;
+  if(t==='set')b=`<h2>Settings</h2><div class="card"><h3>Payment QR</h3>${s.qr?`<img class="qr" src="${esc(s.qr)}" alt="QR">`:'<p class="mut">QR abhi nahi lagaya.</p>'}
+    <input type="file" id="qrf" accept="image/*" onchange="upQR(this)"><label>UPI ID (optional)</label><input id="upi" value="${esc(s.upi)}"><button class="b" onclick="DB.settings.upi=$('#upi').value.trim();save();toast('Saved')">UPI save karein</button></div>
+    <div class="card"><h3>Admin login badlein</h3><label>Admin username</label><input id="au" value="${esc(s.admin)}"><label>Naya password</label><input id="ap" type="password" placeholder="Khaali = purana hi rahega"><button class="b" onclick="saveAdmin()">Save karein</button></div>
+    <div class="card"><h3>Danger zone</h3><button class="b r" onclick="if(confirm('Sab data delete ho jayega. Pakka?')){localStorage.removeItem(K);logout();location.reload()}">Reset all data</button></div>`;
+  return shell('Admin panel',[['dash','Dashboard'],['dep','Deposits'+(pend?` (${pend})`:'')],['act','Activity'],['usr','Resellers'],['stk','Stock'],['prc','Prices'],['set','Settings']],t,b)}
+function decide(id,ok){const d=DB.deposits.find(x=>x.id===id);if(!d||d.status!=='pending')return;
+  d.status=ok?'approved':'rejected';if(ok){const u=DB.users.find(x=>x.id===d.userId);if(u)u.balance+=d.amount}d.seen=false;log('admin',d.userId,'Deposit '+(ok?'approve':'reject')+' hua: '+inr(d.amount)+' · UTR '+d.utr);save();render();toast(ok?'Balance add ho gaya':'Reject kiya')}
+function adjBal(id){const u=DB.users.find(x=>x.id===id),v=prompt('Balance badlav (+ jodne ke liye, - ghatane ke liye):','0');if(v===null||isNaN(+v))return;u.balance+=+v;log('admin',id,'Admin ne balance badla: '+v);save();render()}
+function blk(id){const u=DB.users.find(x=>x.id===id);u.blocked=!u.blocked;log('admin',id,u.blocked?'Account block kiya':'Account unblock kiya');save();render()}
+async function resetPw(id){const v=prompt('Naya password (6+ characters):');if(!v||v.length<6)return;DB.users.find(x=>x.id===id).pass=await H(v);save();toast('Password badal diya')}
+function delUser(id){if(confirm('Reseller delete karein?')){const x=DB.users.find(u=>u.id===id);log('admin',null,'Reseller delete: '+(x?x.username:id));DB.users=DB.users.filter(u=>u.id!==id);save();render()}}
+function addStock(){const c=$('#sc').value,l=$('#sn').value.split('\n').map(x=>x.trim()).filter(Boolean);if(!l.length)return toast('Numbers daalein');
+  const have=new Set(DB.stock.map(n=>n.number));let a=0;l.forEach(n=>{if(!have.has(n)){DB.stock.push({id:uid(),country:c,number:n,sold:false});have.add(n);a++}});save();render();toast(a+' number add hue')}
+function delStock(id){DB.stock=DB.stock.filter(n=>n.id!==id);save();render()}
+function setPrice(c,v){if(+v>=0){DB.prices.find(p=>p.code===c).price=+v;save();toast('Price update')}}
+function addCountry(){const n=$('#cn').value.trim(),c=$('#cc').value.trim().toUpperCase(),p=+$('#cp').value;
+  if(!n||!c||!(p>=0)||$('#cp').value==='')return toast('Sab fields bharein');if(DB.prices.some(x=>x.code===c))return toast('Ye code pehle se hai');
+  DB.prices.push({code:c,name:n,price:p});save();render()}
+function delCountry(c){if(confirm('Country delete karein?')){DB.prices=DB.prices.filter(p=>p.code!==c);save();render()}}
+function upQR(i){const f=i.files[0];if(!f)return;if(f.size>600000)return toast('Image 600KB se chhoti rakhein');
+  const r=new FileReader();r.onload=()=>{DB.settings.qr=r.result;save();render();toast('QR lag gaya')};r.readAsDataURL(f)}
+async function saveAdmin(){const u=$('#au').value.trim(),p=$('#ap').value;if(!u)return toast('Username daalein');
+  DB.settings.admin=u;if(p){if(p.length<6)return toast('Password 6+ characters');DB.settings.pass=await H(p)}save();toast('Admin login save ho gaya')}
+
+/* ---------- SHELL ---------- */
+function shell(title,tabs,cur,body){
+  return `<header><b>NumberPanel</b><span>${title} <button class="b s o" style="color:inherit;border-color:currentColor" onclick="logout()">Logout</button></span></header>
+  <nav>${tabs.map(t=>`<button class="${t[0]===cur?'on':''}" onclick="go('${t[0]}')">${t[1]}</button>`).join('')}</nav>
+  <main><div class="warn">Demo mode: data sirf is browser mein save hota hai. Alag-alag logon ke liye backend chahiye.</div>${body}</main>`}
+function go(t){need=0;tab=t;if(S&&S.role==='user'&&t==='fund'){log('view',S.id,'Payment / QR page khola');save()}render()}
+function seen(id){const d=DB.deposits.find(x=>x.id===id);if(d){d.seen=true;save();render()}}
+function render(){$('#app').innerHTML=!S?`<header><b>NumberPanel</b><span>WhatsApp numbers – USA · UK · India · Pakistan</span></header>`+authView():S.role==='admin'?adminView():userView()}
+init();
+</script>
+</body>
+</html>
